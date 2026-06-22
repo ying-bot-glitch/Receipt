@@ -46,6 +46,7 @@
   .badge-soup { background: #E6F1FB; color: #185FA5; }
   .badge-pot { background: #FAEEDA; color: #854F0B; }
   .badge-healthy { background: #EEF3EF; color: #3B6D11; }
+  .badge-western { background: #EEEDFE; color: #534AB7; }
 
   /* Forms */
   label { font-size: 13px; color: var(--ink-mid); display: block; margin-bottom: 5px; }
@@ -165,6 +166,7 @@
     <button class="nav-tab active" onclick="showPage('today')">今日推荐</button>
     <button class="nav-tab" onclick="showPage('library')">菜谱库</button>
     <button class="nav-tab" onclick="showPage('add')">添加菜谱</button>
+    <button class="nav-tab" onclick="showPage('fridge')">冰箱找菜</button>
   </div>
 </nav>
 
@@ -187,8 +189,29 @@
     </div>
   </div>
 
-  <div style="margin-bottom:1rem">
-    <button class="btn btn-primary btn-full" onclick="generateMenu()" id="gen-btn">生成今日菜单</button>
+  <div style="margin-bottom:1rem;display:flex;gap:8px">
+    <button class="btn btn-primary" style="flex:1" onclick="generateMenu()" id="gen-btn">生成今日菜单</button>
+    <button class="btn btn-outline" onclick="showManualPick()" id="manual-btn">手动点菜</button>
+  </div>
+  <!-- Manual pick modal inline -->
+  <div id="manual-pick" style="display:none;background:white;border:1px solid #E8E4DC;border-radius:12px;padding:1rem;margin-bottom:1rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:15px;font-weight:500">手动点菜</span>
+      <button onclick="document.getElementById('manual-pick').style.display='none'" style="background:none;border:none;font-size:20px;color:#B4B2A9;cursor:pointer">×</button>
+    </div>
+    <div class="filter-bar" style="margin-bottom:10px" id="pick-filter-bar">
+      <button class="filter-chip active" onclick="renderPickList('',this)">全部</button>
+      <button class="filter-chip" onclick="renderPickList('荤菜',this)">荤菜</button>
+      <button class="filter-chip" onclick="renderPickList('素菜',this)">素菜</button>
+      <button class="filter-chip" onclick="renderPickList('汤',this)">汤</button>
+      <button class="filter-chip" onclick="renderPickList('一锅出',this)">一锅出</button>
+      <button class="filter-chip" onclick="renderPickList('西餐',this)">西餐</button>
+    </div>
+    <div id="pick-list" style="max-height:240px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <span style="font-size:13px;color:#5F5E5A">已选 <span id="pick-count">0</span> 道</span>
+      <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="confirmManualPick()">确认这份菜单</button>
+    </div>
   </div>
 
   <div id="daily-result"></div>
@@ -215,6 +238,7 @@
     <button class="filter-chip" onclick="setFilter('素菜',this)">素菜</button>
     <button class="filter-chip" onclick="setFilter('汤',this)">汤</button>
     <button class="filter-chip" onclick="setFilter('一锅出',this)">一锅出</button>
+    <button class="filter-chip" onclick="setFilter('西餐',this)">西餐</button>
     <button class="filter-chip" onclick="setFilter('healthy',this)">健康减脂</button>
   </div>
 
@@ -249,6 +273,7 @@
             <option value="素菜">素菜 🥦</option>
             <option value="汤">汤 🍲</option>
             <option value="一锅出">一锅出 🥘</option>
+          <option value="西餐">西餐 🍝</option>
           </select>
         </div>
         <div class="form-field">
@@ -262,7 +287,7 @@
       <div class="form-field" style="margin-bottom:10px">
         <label>封面图 <span style="color:#B4B2A9">——截图上传（选填）</span></label>
         <div style="display:flex;align-items:center;gap:10px">
-          <div id="cover-preview" style="width:72px;height:72px;border-radius:8px;border:1px dashed #C5D8C7;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;background:#EEF3EF;flex-shrink:0" onclick="document.getElementById('cover-input').click()">📷</div>
+          <div id="cover-preview" style="width:72px;height:72px;border-radius:8px;border:1px dashed #C5D8C7;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;background:#EEF3EF;flex-shrink:0" onclick="document.getElementById('cover-input').click()" ondragover="event.preventDefault();this.style.borderColor='#6B8F71'" ondragleave="this.style.borderColor='#C5D8C7'" ondrop="handleCoverDrop(event)">📷</div>
           <span style="font-size:12px;color:#B4B2A9">截小红书封面图上传，推荐时显示</span>
         </div>
         <input type="file" id="cover-input" accept="image/*" style="display:none" onchange="handleCoverUpload(this)">
@@ -303,6 +328,7 @@
             <option value="素菜">素菜 🥦</option>
             <option value="汤">汤 🍲</option>
             <option value="一锅出">一锅出 🥘</option>
+          <option value="西餐">西餐 🍝</option>
           </select>
         </div>
       </div>
@@ -339,6 +365,31 @@
 </div>
 
 <!-- Detail Modal -->
+<!-- FRIDGE -->
+<div class="page" id="page-fridge">
+  <p class="section-title" style="margin-bottom:1rem">冰箱里有什么？</p>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="form-field" style="margin-bottom:10px">
+      <label>输入食材 <span style="color:#B4B2A9">——用逗号或空格分隔，如：鸡蛋 番茄 土豆</span></label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="fridge-input" placeholder="鸡蛋，番茄，豆腐..." style="flex:1" onkeydown="if(event.key==='Enter')addIngredients()">
+        <button class="btn btn-outline btn-sm" onclick="addIngredients()">添加</button>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="margin-bottom:6px;display:block">或拍照识别食材</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('fridge-photo').click()">📷 拍照/上传</button>
+        <span id="photo-status" style="font-size:12px;color:#B4B2A9"></span>
+      </div>
+      <input type="file" id="fridge-photo" accept="image/*" capture="environment" style="display:none" onchange="recognizeIngredients(this)">
+    </div>
+    <div id="fridge-tags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:28px"></div>
+  </div>
+  <button class="btn btn-primary btn-full" onclick="searchByIngredients()" style="margin-bottom:1rem">🔍 从菜谱库里找能做的菜</button>
+  <div id="fridge-result"></div>
+</div>
+
 <div class="modal-bg" id="modal-bg" onclick="closeModal(event)">
   <div class="modal" id="modal-content"></div>
 </div>
@@ -409,10 +460,11 @@ function showPage(id) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
   const tabs = document.querySelectorAll('.nav-tab');
-  const map = {today:0,library:1,add:2};
+  const map = {today:0,library:1,add:2,fridge:3};
   tabs[map[id]].classList.add('active');
   if (id === 'library') renderLibrary();
   if (id === 'today') renderJieqi();
+  if (id === 'fridge') renderFridge();
 }
 
 // ── Mode ──────────────────────────────────────────────
@@ -496,7 +548,7 @@ async function aiHealthyPick(pool, hist) {
 }
 
 // ── Render daily ──────────────────────────────────────
-const catLabel = {荤菜:'🥩 荤菜', 素菜:'🥦 素菜', 汤:'🍲 汤', 一锅出:'🥘 一锅出'};
+const catLabel = {荤菜:'🥩 荤菜', 素菜:'🥦 素菜', 汤:'🍲 汤', 一锅出:'🥘 一锅出', 西餐:'🍝 西餐'};
 
 function renderDailyResult(chosen) {
   document.getElementById('daily-result').innerHTML = chosen.map(r => `
@@ -525,7 +577,7 @@ function renderDailyResult(chosen) {
 }
 
 function catBadge(cat) {
-  return {荤菜:'badge-meat',素菜:'badge-veg',汤:'badge-soup',一锅出:'badge-pot'}[cat]||'';
+  return {荤菜:'badge-meat',素菜:'badge-veg',汤:'badge-soup',一锅出:'badge-pot',西餐:'badge-western'}[cat]||'';
 }
 
 function setFeedback(id, fb, btn, rid) {
@@ -712,6 +764,33 @@ function handleCoverUpload(input) {
     preview.innerHTML = `<img src="${coverImageData}" style="width:72px;height:72px;object-fit:cover;border-radius:8px">`;
   };
   reader.readAsDataURL(file);
+}
+
+function handleCoverDrop(event) {
+  event.preventDefault();
+  event.currentTarget.style.borderColor = '#C5D8C7';
+  const file = event.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('image/')) { showToast('请拖入图片文件'); return; }
+  const dt = { files: [file] };
+  // reuse handleCoverUpload via fake input
+  const reader = new FileReader();
+  reader.onload = e => {
+    coverImageData = e.target.result;
+    const preview = document.getElementById('cover-preview');
+    preview.innerHTML = `<img src="${coverImageData}" style="width:72px;height:72px;object-fit:cover;border-radius:8px">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleFileDrop(event) {
+  event.preventDefault();
+  const dz = document.getElementById('drop-zone');
+  dz.style.borderColor = '';
+  dz.style.background = '';
+  const file = event.dataTransfer.files[0];
+  if (!file) return;
+  const fakeInput = { files: [file] };
+  handleFileUpload(fakeInput);
 }
 
 function saveFromLink() {
@@ -977,6 +1056,158 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── Manual Pick ───────────────────────────────────────
+let manualPicked = new Set();
+
+function showManualPick() {
+  manualPicked.clear();
+  document.getElementById('manual-pick').style.display = 'block';
+  renderPickList('', document.querySelector('#pick-filter-bar .filter-chip'));
+}
+
+function renderPickList(cat, el) {
+  if (el) {
+    document.querySelectorAll('#pick-filter-bar .filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+  const recipes = load();
+  const list = cat ? recipes.filter(r => r.cat === cat) : recipes;
+  const grid = document.getElementById('pick-list');
+  grid.innerHTML = list.map(r => `
+    <div onclick="togglePick(${r.id},this)" data-id="${r.id}" style="padding:8px 10px;border:1px solid ${manualPicked.has(r.id)?'#6B8F71':'#E8E4DC'};border-radius:8px;cursor:pointer;background:${manualPicked.has(r.id)?'#EEF3EF':'white'};font-size:13px">
+      <div style="font-weight:500;color:${manualPicked.has(r.id)?'#3B6D11':'#2C2C2A'}">${r.name}</div>
+      <div style="font-size:11px;color:#B4B2A9;margin-top:2px">${r.cat}${r.isVideo?' · 视频':''}</div>
+    </div>
+  `).join('');
+  document.getElementById('pick-count').textContent = manualPicked.size;
+}
+
+function togglePick(id, el) {
+  if (manualPicked.has(id)) {
+    manualPicked.delete(id);
+    el.style.border = '1px solid #E8E4DC';
+    el.style.background = 'white';
+    el.querySelector('div').style.color = '#2C2C2A';
+  } else {
+    manualPicked.add(id);
+    el.style.border = '1px solid #6B8F71';
+    el.style.background = '#EEF3EF';
+    el.querySelector('div').style.color = '#3B6D11';
+  }
+  document.getElementById('pick-count').textContent = manualPicked.size;
+}
+
+function confirmManualPick() {
+  if (!manualPicked.size) { showToast('请先选择菜品'); return; }
+  const recipes = load();
+  const chosen = [...manualPicked].map(id => recipes.find(r => r.id === id)).filter(Boolean);
+  document.getElementById('manual-pick').style.display = 'none';
+  renderDailyResult(chosen);
+  renderWechat(chosen);
+  document.getElementById('wechat-section').style.display = 'block';
+  saveHist([...loadHist(), ...chosen.map(r => r.id)]);
+}
+
+// ── Fridge ─────────────────────────────────────────────
+let fridgeIngredients = new Set();
+
+function renderFridge() {
+  renderFridgeTags();
+}
+
+function addIngredients() {
+  const val = document.getElementById('fridge-input').value.trim();
+  if (!val) return;
+  val.split(/[，,、\s]+/).filter(Boolean).forEach(i => fridgeIngredients.add(i.trim()));
+  document.getElementById('fridge-input').value = '';
+  renderFridgeTags();
+}
+
+function renderFridgeTags() {
+  const el = document.getElementById('fridge-tags');
+  el.innerHTML = [...fridgeIngredients].map(i => `
+    <span style="display:inline-flex;align-items:center;gap:4px;background:#EEF3EF;color:#3B6D11;padding:4px 10px;border-radius:20px;font-size:13px">
+      ${i}<button onclick="fridgeIngredients.delete('${i}');renderFridgeTags()" style="background:none;border:none;color:#6B8F71;cursor:pointer;padding:0;font-size:14px;line-height:1">×</button>
+    </span>
+  `).join('');
+}
+
+async function recognizeIngredients(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('photo-status');
+  status.textContent = 'AI 识别中...';
+  try {
+    const reader = new FileReader();
+    const base64 = await new Promise(res => { reader.onload = e => res(e.target.result.split(',')[1]); reader.readAsDataURL(file); });
+    const text = await callClaude(`请识别图片中的食材，只返回逗号分隔的食材名称列表，不要其他说明，如：鸡蛋,番茄,土豆,葱`);
+    // Since we can't pass image to callClaude easily here, use the API directly with image
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt: '请识别图片中的食材，只返回逗号分隔的食材名称列表，不要其他说明，例如：鸡蛋,番茄,土豆', images: [{base64, type: file.type}] })
+    });
+    const data = await res.json();
+    const items = (data.text || '').split(/[,，]+/).map(s => s.trim()).filter(Boolean);
+    items.forEach(i => fridgeIngredients.add(i));
+    renderFridgeTags();
+    status.textContent = `识别到 ${items.length} 种食材 ✓`;
+  } catch(e) {
+    status.textContent = '识别失败，请手动输入';
+  }
+  input.value = '';
+}
+
+function searchByIngredients() {
+  if (!fridgeIngredients.size) { showToast('请先添加食材'); return; }
+  const recipes = load();
+  const have = [...fridgeIngredients].map(s => s.toLowerCase());
+
+  const results = recipes.map(r => {
+    const ingrList = r.ingr.split(/[，,]+/).map(s => s.replace(/\d+[gkgml个只条根片块斤两勺茶匙汤匙杯]+/gi,'').trim().toLowerCase());
+    const matched = ingrList.filter(ing => have.some(h => ing.includes(h) || h.includes(ing)));
+    const missing = ingrList.filter(ing => ing && !have.some(h => ing.includes(h) || h.includes(ing)));
+    return { r, matched, missing, score: matched.length / Math.max(ingrList.length, 1) };
+  }).filter(x => x.matched.length > 0).sort((a,b) => b.score - a.score);
+
+  const el = document.getElementById('fridge-result');
+  if (!results.length) {
+    el.innerHTML = '<div class="empty"><div class="icon">🥢</div><p>没找到匹配的菜谱，试着多加几种食材</p></div>';
+    return;
+  }
+
+  el.innerHTML = results.map(({r, matched, missing, score}) => `
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span class="badge ${catBadge(r.cat)}">${r.cat}</span>
+        <span style="font-weight:500;font-size:15px;flex:1">${r.name}</span>
+        <span style="font-size:12px;color:#6B8F71;font-weight:500">${Math.round(score*100)}% 匹配</span>
+      </div>
+      <div style="font-size:12px;margin-bottom:6px">
+        <span style="color:#3B6D11">✓ 已有：${matched.join('、') || '—'}</span>
+      </div>
+      ${missing.length ? `<div style="font-size:12px;color:#A32D2D;margin-bottom:8px">🛒 还需购买：${missing.join('、')}</div>` : '<div style="font-size:12px;color:#3B6D11;margin-bottom:8px">✓ 食材齐全，可以直接做！</div>'}
+      <button class="btn btn-outline btn-sm" onclick="addToToday(${r.id})">+ 加入今日菜单</button>
+    </div>
+  `).join('');
+}
+
+function addToToday(id) {
+  const recipes = load();
+  const r = recipes.find(x => x.id === id);
+  if (!r) return;
+  // Get existing chosen from DOM
+  const existingIds = [...document.querySelectorAll('[id^="dr-"]')].map(el => parseInt(el.id.replace('dr-','')));
+  if (existingIds.includes(id)) { showToast('这道菜已在今日菜单里'); return; }
+  const existing = existingIds.map(eid => recipes.find(x => x.id === eid)).filter(Boolean);
+  const chosen = [...existing, r];
+  renderDailyResult(chosen);
+  renderWechat(chosen);
+  document.getElementById('wechat-section').style.display = 'block';
+  showToast(`"${r.name}" 已加入今日菜单 ✓`);
+  showPage('today');
 }
 
 // ── Init ──────────────────────────────────────────────
