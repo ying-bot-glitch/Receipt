@@ -233,7 +233,12 @@
   <div class="import-panel active" id="import-link">
     <div class="card">
       <div class="form-field" style="margin-bottom:10px">
-        <label>菜名</label>
+        <label>粘贴小红书分享内容 <span style="color:#B4B2A9">——直接粘贴，自动提取链接和标题</span></label>
+        <textarea id="link-paste" style="min-height:72px" placeholder="把小红书复制的内容直接粘贴到这里，如：&#10;61 【以前的我是不敢想的...】😆 https://www.xiaohongshu.com/..." onpaste="setTimeout(()=>parsePaste(),100)" oninput="parsePaste()"></textarea>
+      </div>
+      <div id="parse-result" style="display:none;margin-bottom:10px;padding:8px 12px;background:var(--sage-light);border-radius:8px;font-size:13px;color:var(--ink-mid)"></div>
+      <div class="form-field" style="margin-bottom:10px">
+        <label>菜名 <span style="color:#B4B2A9">——自动提取，可修改</span></label>
         <input type="text" id="link-name" placeholder="如：鲜虾Taco">
       </div>
       <div class="form-row two">
@@ -255,12 +260,16 @@
         </div>
       </div>
       <div class="form-field" style="margin-bottom:10px">
-        <label>视频链接（小红书 / B站 / 抖音等）</label>
-        <input type="url" id="link-url" placeholder="https://www.xiaohongshu.com/...">
+        <label>封面图 <span style="color:#B4B2A9">——截图上传（选填）</span></label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div id="cover-preview" style="width:72px;height:72px;border-radius:8px;border:1px dashed #C5D8C7;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;background:#EEF3EF;flex-shrink:0" onclick="document.getElementById('cover-input').click()">📷</div>
+          <span style="font-size:12px;color:#B4B2A9">截小红书封面图上传，推荐时显示</span>
+        </div>
+        <input type="file" id="cover-input" accept="image/*" style="display:none" onchange="handleCoverUpload(this)">
       </div>
       <div class="form-field" style="margin-bottom:12px">
-        <label>备注（选填）<span style="color:#B4B2A9">——如：4人份、少放辣</span></label>
-        <input type="text" id="link-note" placeholder="">
+        <label>备注（选填）</label>
+        <input type="text" id="link-note" placeholder="如：4人份、少放辣">
       </div>
       <button class="btn btn-primary btn-full" onclick="saveFromLink()">保存到菜谱库</button>
     </div>
@@ -492,6 +501,7 @@ const catLabel = {荤菜:'🥩 荤菜', 素菜:'🥦 素菜', 汤:'🍲 汤', �
 function renderDailyResult(chosen) {
   document.getElementById('daily-result').innerHTML = chosen.map(r => `
     <div class="daily-recipe" id="dr-${r.id}">
+      ${r.cover ? `<img src="${r.cover}" style="width:100%;height:140px;object-fit:cover">` : ''}
       <div class="daily-recipe-hd">
         <span class="badge ${catBadge(r.cat)}">${catLabel[r.cat]||r.cat}</span>
         <h3>${r.name}</h3>
@@ -597,6 +607,7 @@ function renderLibrary() {
   }
   grid.innerHTML = filtered.map(r => `
     <div class="recipe-tile" onclick="openDetail(${r.id})">
+      ${r.cover ? `<img src="${r.cover}" style="width:100%;height:80px;object-fit:cover;border-radius:8px;margin-bottom:8px">` : ''}
       <div class="tag-row">
         <span class="badge ${catBadge(r.cat)}">${r.cat}</span>
         ${r.healthy==='healthy'?'<span class="badge badge-healthy">减脂</span>':''}
@@ -659,11 +670,58 @@ function setImport(type, el) {
 }
 
 // ── Link import ───────────────────────────────────────
+let coverImageData = ''; // base64 cover image
+
+function parsePaste() {
+  const text = document.getElementById('link-paste').value;
+
+  // Extract URL
+  const urlMatch = text.match(/https?:\/\/[^\s😆]+/);
+  const url = urlMatch ? urlMatch[0].trim() : '';
+
+  // Extract title from 【...】
+  const titleMatch = text.match(/【([^】]+)】/);
+  let title = '';
+  if (titleMatch) {
+    // Remove author part after " - "
+    title = titleMatch[1].split(' - ')[0].trim();
+  }
+
+  const resultEl = document.getElementById('parse-result');
+  if (url || title) {
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `${title ? '✓ 标题：' + title + '<br>' : ''}${url ? '✓ 链接已提取' : '⚠️ 未找到链接'}`;
+    if (title && !document.getElementById('link-name').value) {
+      document.getElementById('link-name').value = title;
+    }
+  } else {
+    resultEl.style.display = 'none';
+  }
+
+  // Store parsed url
+  document.getElementById('link-paste').dataset.url = url;
+}
+
+function handleCoverUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    coverImageData = e.target.result; // data URL
+    const preview = document.getElementById('cover-preview');
+    preview.innerHTML = `<img src="${coverImageData}" style="width:72px;height:72px;object-fit:cover;border-radius:8px">`;
+  };
+  reader.readAsDataURL(file);
+}
+
 function saveFromLink() {
   const name = document.getElementById('link-name').value.trim();
-  const url = document.getElementById('link-url').value.trim();
+  const pasteEl = document.getElementById('link-paste');
+  const url = pasteEl.dataset.url || '';
+
   if (!name) { showToast('请填写菜名'); return; }
-  if (!url) { showToast('请填写视频链接'); return; }
+  if (!url) { showToast('未找到链接，请确认粘贴内容包含 https:// 开头的链接'); return; }
+
   const r = {
     id: Date.now(),
     name,
@@ -672,6 +730,7 @@ function saveFromLink() {
     ingr: '',
     steps: '请点击下方原视频链接，照着视频步骤操作。',
     link: url,
+    cover: coverImageData || '',
     note: document.getElementById('link-note').value.trim(),
     feedback: '',
     isVideo: true,
@@ -680,9 +739,15 @@ function saveFromLink() {
   recipes.push(r);
   save(recipes);
   showToast(`"${name}" 已保存 ✓`);
+
+  // Reset form
+  pasteEl.value = '';
+  pasteEl.dataset.url = '';
   document.getElementById('link-name').value = '';
-  document.getElementById('link-url').value = '';
   document.getElementById('link-note').value = '';
+  document.getElementById('parse-result').style.display = 'none';
+  document.getElementById('cover-preview').innerHTML = '📷';
+  coverImageData = '';
   showPage('library');
 }
 
