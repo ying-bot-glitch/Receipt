@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家厨菜谱</title>
+<style>
+  :root {
+    --sage: #6B8F71;
+    --sage-light: #EEF3EF;
+    --sage-mid: #C5D8C7;
+    --warm: #F7F4EF;
+    --ink: #2C2C2A;
+    --ink-mid: #5F5E5A;
+    --ink-light: #B4B2A9;
+    --accent: #C17F4A;
+    --accent-light: #FAF0E6;
+    --red-light: #FCEBEB;
+    --red: #A32D2D;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif; background: var(--warm); color: var(--ink); min-height: 100vh; }
+
+  /* Nav */
+  .nav { background: white; border-bottom: 1px solid #E8E4DC; padding: 0 1rem; display: flex; align-items: center; gap: 0; position: sticky; top: 0; z-index: 100; }
+  .nav-logo { font-size: 15px; font-weight: 600; color: var(--sage); padding: 14px 1rem 14px 0; border-right: 1px solid #E8E4DC; margin-right: 0.5rem; white-space: nowrap; }
+  .nav-tabs { display: flex; overflow-x: auto; scrollbar-width: none; gap: 0; }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+  .nav-tab { padding: 14px 14px; font-size: 13px; color: var(--ink-mid); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; white-space: nowrap; flex-shrink: 0; }
+  .nav-tab.active { color: var(--sage); border-bottom-color: var(--sage); font-weight: 500; }
+
+  /* Layout */
+  .page { display: none; padding: 1.25rem 1rem 4rem; max-width: 700px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* Cards */
+  .card { background: white; border-radius: var(--radius); border: 1px solid #E8E4DC; padding: 1rem 1.25rem; margin-bottom: 0.75rem; }
+  .card-sm { padding: 0.75rem 1rem; }
+
+  /* Badges */
+  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+  .badge-meat { background: #FAECE7; color: #993C1D; }
+  .badge-veg { background: #EAF3DE; color: #3B6D11; }
+  .badge-soup { background: #E6F1FB; color: #185FA5; }
+  .badge-pot { background: #FAEEDA; color: #854F0B; }
+  .badge-healthy { background: #EEF3EF; color: #3B6D11; }
+
+  /* Forms */
+  label { font-size: 13px; color: var(--ink-mid); display: block; margin-bottom: 5px; }
+  input, select, textarea { width: 100%; font-size: 14px; border: 1px solid #D3D1C7; border-radius: var(--radius-sm); padding: 9px 12px; background: white; color: var(--ink); font-family: inherit; outline: none; }
+  input:focus, select:focus, textarea:focus { border-color: var(--sage); box-shadow: 0 0 0 3px rgba(107,143,113,0.12); }
+  textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+  .form-row { display: grid; gap: 10px; margin-bottom: 12px; }
+  .form-row.two { grid-template-columns: 1fr 1fr; }
+  .form-field { display: flex; flex-direction: column; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; font-family: inherit; }
+  .btn-primary { background: var(--sage); color: white; border-color: var(--sage); }
+  .btn-primary:hover { background: #5a7a60; }
+  .btn-outline { background: white; color: var(--ink); border-color: #D3D1C7; }
+  .btn-outline:hover { background: var(--warm); }
+  .btn-accent { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn-full { width: 100%; justify-content: center; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-danger { background: var(--red-light); color: var(--red); border-color: #F7C1C1; }
+
+  /* Recipe grid */
+  .recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .recipe-tile { background: white; border: 1px solid #E8E4DC; border-radius: var(--radius); padding: 12px; cursor: pointer; position: relative; transition: border-color 0.15s; }
+  .recipe-tile:hover { border-color: var(--sage-mid); }
+  .recipe-tile h4 { font-size: 14px; font-weight: 500; margin: 6px 0 4px; color: var(--ink); }
+  .recipe-tile p { font-size: 12px; color: var(--ink-light); }
+  .recipe-tile .tile-actions { display: flex; gap: 4px; margin-top: 8px; }
+  .feedback-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot-good { background: #3B6D11; }
+  .dot-bad { background: var(--red); }
+
+  /* Section headers */
+  .section-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .section-hd h2 { font-size: 16px; font-weight: 600; color: var(--ink); }
+
+  /* Mode selector */
+  .mode-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 1.25rem; }
+  .mode-card { background: white; border: 1.5px solid #E8E4DC; border-radius: var(--radius); padding: 12px 8px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .mode-card.active { border-color: var(--sage); background: var(--sage-light); }
+  .mode-card .icon { font-size: 22px; margin-bottom: 4px; }
+  .mode-card .label { font-size: 12px; font-weight: 500; color: var(--ink-mid); }
+  .mode-card.active .label { color: var(--sage); }
+
+  /* Daily result */
+  .daily-recipe { background: white; border: 1px solid #E8E4DC; border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+  .daily-recipe-hd { padding: 12px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #F0EDE8; }
+  .daily-recipe-hd h3 { font-size: 15px; font-weight: 500; flex: 1; }
+  .daily-recipe-body { padding: 12px 16px; }
+  .daily-recipe-body .ingr { font-size: 13px; color: var(--ink-mid); margin-bottom: 8px; }
+  .daily-recipe-body .steps { font-size: 13px; color: var(--ink); line-height: 1.75; white-space: pre-wrap; }
+  .daily-recipe-body .link { margin-top: 8px; }
+  .daily-recipe-body .link a { font-size: 12px; color: var(--sage); text-decoration: none; }
+  .feedback-row { display: flex; gap: 6px; padding: 10px 16px; border-top: 1px solid #F0EDE8; }
+  .feedback-btn { flex: 1; padding: 7px; border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; border: 1px solid #E8E4DC; background: white; color: var(--ink-mid); text-align: center; }
+  .feedback-btn.active-good { background: #EAF3DE; border-color: #C0DD97; color: #3B6D11; }
+  .feedback-btn.active-bad { background: var(--red-light); border-color: #F7C1C1; color: var(--red); }
+
+  /* Wechat preview */
+  .wechat-preview { background: #F0EDE8; border-radius: var(--radius); padding: 1rem; font-size: 13px; line-height: 1.9; color: var(--ink); white-space: pre-wrap; font-family: inherit; margin-bottom: 10px; max-height: 360px; overflow-y: auto; }
+
+  /* Jieqi banner */
+  .jieqi-banner { background: linear-gradient(135deg, var(--sage-light), var(--accent-light)); border: 1px solid var(--sage-mid); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 1rem; font-size: 13px; color: var(--ink-mid); display: flex; align-items: center; gap: 8px; }
+
+  /* Import area */
+  .import-tabs { display: flex; gap: 8px; margin-bottom: 1rem; }
+  .import-tab { padding: 7px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; border: 1px solid #D3D1C7; background: white; color: var(--ink-mid); }
+  .import-tab.active { background: var(--sage); color: white; border-color: var(--sage); }
+  .import-panel { display: none; }
+  .import-panel.active { display: block; }
+  .drop-zone { border: 2px dashed var(--sage-mid); border-radius: var(--radius); padding: 2rem 1rem; text-align: center; cursor: pointer; background: var(--sage-light); }
+  .drop-zone p { font-size: 14px; color: var(--ink-mid); margin-top: 8px; }
+  .drop-zone .hint { font-size: 12px; color: var(--ink-light); margin-top: 4px; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+  .filter-chip { padding: 5px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid #D3D1C7; background: white; color: var(--ink-mid); }
+  .filter-chip.active { background: var(--sage); color: white; border-color: var(--sage); }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+  /* Loading */
+  .loading { text-align: center; padding: 1.5rem; color: var(--ink-mid); font-size: 14px; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--sage-mid); border-top-color: var(--sage); border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Empty */
+  .empty { text-align: center; padding: 3rem 1rem; color: var(--ink-light); }
+  .empty .icon { font-size: 40px; margin-bottom: 12px; }
+  .empty p { font-size: 14px; }
+
+  /* Detail modal */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: flex-end; justify-content: center; }
+  .modal-bg.open { display: flex; }
+  .modal { background: white; border-radius: var(--radius) var(--radius) 0 0; width: 100%; max-width: 700px; max-height: 85vh; overflow-y: auto; padding: 1.25rem 1.25rem 2rem; }
+  @media(min-width:600px) { .modal-bg { align-items: center; } .modal { border-radius: var(--radius); max-height: 80vh; } }
+  .modal-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .modal-hd h2 { font-size: 18px; font-weight: 600; }
+  .close-btn { background: none; border: none; font-size: 22px; color: var(--ink-mid); cursor: pointer; padding: 0; line-height: 1; }
+
+  @media(max-width:480px) { .mode-cards { grid-template-columns: repeat(3,1fr); } .recipe-grid { grid-template-columns: repeat(2,1fr); } .form-row.two { grid-template-columns: 1fr; } }
+
+  .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 1.25rem; }
+  .stat-box { background: white; border: 1px solid #E8E4DC; border-radius: var(--radius-sm); padding: 10px; text-align: center; }
+  .stat-box .num { font-size: 22px; font-weight: 600; color: var(--sage); }
+  .stat-box .lbl { font-size: 11px; color: var(--ink-light); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">🥢 家厨</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('today')">今日推荐</button>
+    <button class="nav-tab" onclick="showPage('library')">菜谱库</button>
+    <button class="nav-tab" onclick="showPage('add')">添加菜谱</button>
+  </div>
+</nav>
+
+<!-- TODAY -->
+<div class="page active" id="page-today">
+  <div id="jieqi-banner" class="jieqi-banner" style="display:none"></div>
+
+  <div class="mode-cards">
+    <div class="mode-card active" onclick="setMode('daily',this)">
+      <div class="icon">🍽️</div>
+      <div class="label">日常</div>
+    </div>
+    <div class="mode-card" onclick="setMode('healthy',this)">
+      <div class="icon">🥗</div>
+      <div class="label">健康</div>
+    </div>
+    <div class="mode-card" onclick="setMode('weekend',this)">
+      <div class="icon">🥘</div>
+      <div class="label">周末一锅</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:1rem">
+    <button class="btn btn-primary btn-full" onclick="generateMenu()" id="gen-btn">生成今日菜单</button>
+  </div>
+
+  <div id="daily-result"></div>
+  <div id="wechat-section" style="display:none">
+    <div class="section-hd" style="margin-top:1.25rem">
+      <h2>发给阿姨</h2>
+    </div>
+    <div class="wechat-preview" id="wechat-text"></div>
+    <button class="btn btn-outline btn-full" onclick="copyMsg()">复制消息</button>
+  </div>
+</div>
+
+<!-- LIBRARY -->
+<div class="page" id="page-library">
+  <div class="stat-row">
+    <div class="stat-box"><div class="num" id="stat-total">0</div><div class="lbl">道菜谱</div></div>
+    <div class="stat-box"><div class="num" id="stat-good">0</div><div class="lbl">家人喜欢</div></div>
+    <div class="stat-box"><div class="num" id="stat-bad">0</div><div class="lbl">不再推荐</div></div>
+  </div>
+
+  <div class="filter-bar" id="filter-bar">
+    <button class="filter-chip active" onclick="setFilter('',this)">全部</button>
+    <button class="filter-chip" onclick="setFilter('荤菜',this)">荤菜</button>
+    <button class="filter-chip" onclick="setFilter('素菜',this)">素菜</button>
+    <button class="filter-chip" onclick="setFilter('汤',this)">汤</button>
+    <button class="filter-chip" onclick="setFilter('一锅出',this)">一锅出</button>
+    <button class="filter-chip" onclick="setFilter('healthy',this)">健康减脂</button>
+  </div>
+
+  <div class="recipe-grid" id="recipe-grid"></div>
+</div>
+
+<!-- ADD -->
+<div class="page" id="page-add">
+  <div class="import-tabs">
+    <button class="import-tab active" onclick="setImport('link',this)">粘贴链接</button>
+    <button class="import-tab" onclick="setImport('file',this)">上传文件</button>
+    <button class="import-tab" onclick="setImport('manual',this)">手动录入</button>
+  </div>
+
+  <!-- Link import -->
+  <div class="import-panel active" id="import-link">
+    <div class="card">
+      <div class="form-field" style="margin-bottom:10px">
+        <label>粘贴菜谱链接（小红书、公众号、B站等）</label>
+        <input type="url" id="link-url" placeholder="https://...">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="importFromLink()">🤖 AI 自动识别菜谱</button>
+    </div>
+    <div id="link-preview" style="display:none"></div>
+  </div>
+
+  <!-- File import -->
+  <div class="import-panel" id="import-file">
+    <div class="card">
+      <div class="drop-zone" onclick="document.getElementById('file-input').click()" id="drop-zone">
+        <div style="font-size:32px">📄</div>
+        <p>上传 Excel 或 PDF 菜谱</p>
+        <div class="hint">支持 .xlsx .xls .pdf 格式</div>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.pdf" style="display:none" onchange="handleFileUpload(this)">
+    </div>
+    <div id="file-preview" style="display:none"></div>
+  </div>
+
+  <!-- Manual -->
+  <div class="import-panel" id="import-manual">
+    <div class="card">
+      <div class="form-row two">
+        <div class="form-field">
+          <label>菜名</label>
+          <input type="text" id="m-name" placeholder="如：番茄炒蛋">
+        </div>
+        <div class="form-field">
+          <label>分类</label>
+          <select id="m-cat">
+            <option value="荤菜">荤菜 🥩</option>
+            <option value="素菜">素菜 🥦</option>
+            <option value="汤">汤 🍲</option>
+            <option value="一锅出">一锅出 🥘</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>健康属性</label>
+          <select id="m-healthy">
+            <option value="normal">普通</option>
+            <option value="healthy">健康减脂</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>食材（逗号分隔）</label>
+          <input type="text" id="m-ingr" placeholder="番茄2个，鸡蛋3个，盐，糖">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>制作步骤</label>
+          <textarea id="m-steps" placeholder="第一步：...&#10;第二步：..."></textarea>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>原帖链接（选填）</label>
+          <input type="url" id="m-link" placeholder="https://...">
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveManual()">保存菜谱</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-bg" id="modal-bg" onclick="closeModal(event)">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Storage ──────────────────────────────────────────
+const DB = 'jiaochu_v2';
+const HIST = 'jiaochu_hist';
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(DB)) || seed(); } catch { return seed(); }
+}
+function save(r) { localStorage.setItem(DB, JSON.stringify(r)); }
+function loadHist() { try { return JSON.parse(localStorage.getItem(HIST)) || []; } catch { return []; } }
+function saveHist(h) { localStorage.setItem(HIST, JSON.stringify(h.slice(-30))); }
+
+function seed() {
+  const recipes = [
+    {id:1,name:'红烧肉',cat:'荤菜',healthy:'normal',ingr:'五花肉500g，生抽，老抽，料酒，冰糖，葱，姜',steps:'第一步：五花肉切块，冷水焯水去腥，捞出备用。\n第二步：锅内放少量油，加冰糖小火炒至焦糖色。\n第三步：放入肉块翻炒上色，加生抽、老抽、料酒。\n第四步：加热水没过肉，大火烧开转小火焖60分钟。\n第五步：大火收汁，汤汁浓稠即可出锅。',link:'',feedback:''},
+    {id:2,name:'蒜蓉炒菠菜',cat:'素菜',healthy:'healthy',ingr:'菠菜300g，大蒜4瓣，盐，花生油',steps:'第一步：菠菜洗净，焯水30秒捞出备用。\n第二步：热锅下油，爆香蒜末至金黄。\n第三步：下菠菜大火翻炒20秒，加盐调味出锅。',link:'',feedback:'good'},
+    {id:3,name:'番茄炒蛋',cat:'素菜',healthy:'normal',ingr:'番茄2个，鸡蛋3个，盐，糖，葱花',steps:'第一步：鸡蛋打散加少许盐，番茄切块备用。\n第二步：热锅多油，鸡蛋液下锅炒至定型盛出。\n第三步：再起锅炒番茄出汁，加少许糖提鲜。\n第四步：倒入鸡蛋翻炒均匀，加盐出锅撒葱花。',link:'',feedback:'good'},
+    {id:4,name:'冬瓜排骨汤',cat:'汤',healthy:'healthy',ingr:'排骨400g，冬瓜300g，姜片，盐，葱',steps:'第一步：排骨冷水焯水，撇去浮沫备用。\n第二步：砂锅加冷水、排骨、姜片，大火煮开。\n第三步：转小火煮40分钟至汤色奶白。\n第四步：加冬瓜块再煮15分钟至软。\n第五步：加盐调味，撒葱花上桌。',link:'',feedback:''},
+    {id:5,name:'土豆炖鸡',cat:'一锅出',healthy:'normal',ingr:'鸡腿4个，土豆2个，胡萝卜1根，生抽，老抽，料酒，姜，蒜，葱',steps:'第一步：鸡腿斩块焯水，土豆胡萝卜切滚刀块。\n第二步：热锅下油，爆香姜蒜，鸡块翻炒至金黄。\n第三步：加生抽、老抽、料酒翻炒上色。\n第四步：加热水没过食材，放土豆胡萝卜。\n第五步：大火烧开转中小火焖25分钟，收汁出锅。',link:'',feedback:''},
+    {id:6,name:'清炒西兰花',cat:'素菜',healthy:'healthy',ingr:'西兰花1棵，大蒜3瓣，盐，橄榄油',steps:'第一步：西兰花切小朵，盐水焯2分钟捞出。\n第二步：热锅下橄榄油，爆香蒜末。\n第三步：下西兰花大火翻炒1分钟，加盐出锅。',link:'',feedback:''},
+    {id:7,name:'紫菜蛋花汤',cat:'汤',healthy:'healthy',ingr:'干紫菜10g，鸡蛋2个，虾皮，盐，香油，葱',steps:'第一步：紫菜提前泡发，鸡蛋打散。\n第二步：锅内水烧开，加紫菜和虾皮。\n第三步：水再次烧开，慢慢淋入蛋液搅拌。\n第四步：加盐、香油，撒葱花出锅。',link:'',feedback:'good'},
+  ];
+  save(recipes);
+  return recipes;
+}
+
+// ── Jieqi ─────────────────────────────────────────────
+const JIEQI = [
+  {m:1,d:5,name:'小寒',tip:'天气寒冷，适合炖汤暖胃，推荐羊肉、排骨汤'},
+  {m:1,d:20,name:'大寒',tip:'一年最冷，多做温补菜，葱姜蒜可多用'},
+  {m:2,d:4,name:'立春',tip:'春意萌动，推荐清炒绿叶菜，口味可以清淡些'},
+  {m:3,d:6,name:'惊蛰',tip:'春雷乍动，多吃春笋、韭菜等当季蔬菜'},
+  {m:4,d:5,name:'清明',tip:'清明前后，荠菜、菠菜正当季'},
+  {m:4,d:20,name:'谷雨',tip:'雨水充沛，香椿、豌豆苗等嫩芽最鲜'},
+  {m:5,d:6,name:'立夏',tip:'天气渐热，多做清爽凉拌和汤类'},
+  {m:6,d:6,name:'芒种',tip:'梅雨季节，多喝薏米、绿豆等祛湿汤'},
+  {m:6,d:21,name:'夏至',tip:'最热时节，推荐清淡素菜，少油少盐'},
+  {m:7,d:7,name:'小暑',tip:'暑热难耐，多做冬瓜、苦瓜等清热菜'},
+  {m:8,d:7,name:'立秋',tip:'秋天来了，开始进补，适合炖鸡、排骨'},
+  {m:9,d:8,name:'白露',tip:'秋燥明显，多做莲藕、银耳等润燥菜'},
+  {m:9,d:23,name:'秋分',tip:'秋高气爽，山药、南瓜正当季'},
+  {m:10,d:8,name:'寒露',tip:'天气转凉，可以开始喝暖汤了'},
+  {m:11,d:7,name:'立冬',tip:'立冬进补，推荐萝卜炖牛肉、羊肉汤'},
+  {m:12,d:7,name:'大雪',tip:'大雪节气，炖汤暖身最合适'},
+  {m:12,d:21,name:'冬至',tip:'冬至大如年，南方推荐汤圆，北方推荐饺子'},
+];
+
+function getCurrentJieqi() {
+  const now = new Date();
+  const m = now.getMonth() + 1, d = now.getDate();
+  let best = null, minDiff = 999;
+  for (const j of JIEQI) {
+    const diff = Math.abs((m - j.m) * 30 + (d - j.d));
+    if (diff < minDiff) { minDiff = diff; best = j; }
+  }
+  return minDiff <= 7 ? best : null;
+}
+
+// ── Pages ─────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  const tabs = document.querySelectorAll('.nav-tab');
+  const map = {today:0,library:1,add:2};
+  tabs[map[id]].classList.add('active');
+  if (id === 'library') renderLibrary();
+  if (id === 'today') renderJieqi();
+}
+
+// ── Mode ──────────────────────────────────────────────
+let currentMode = 'daily';
+function setMode(m, el) {
+  currentMode = m;
+  document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('daily-result').innerHTML = '';
+  document.getElementById('wechat-section').style.display = 'none';
+}
+
+// ── Jieqi banner ──────────────────────────────────────
+function renderJieqi() {
+  const j = getCurrentJieqi();
+  const el = document.getElementById('jieqi-banner');
+  if (j) { el.style.display = 'flex'; el.innerHTML = `🌿 <span><strong>${j.name}</strong> · ${j.tip}</span>`; }
+  else el.style.display = 'none';
+}
+
+// ── Generate ──────────────────────────────────────────
+function pickRandom(arr, exclude, n) {
+  const pool = arr.filter(r => !exclude.includes(r.id) && r.feedback !== 'bad');
+  const res = [];
+  const used = [...exclude.map(String)];
+  for (let i = 0; i < n; i++) {
+    const avail = pool.filter(r => !used.includes(String(r.id)));
+    if (!avail.length) { const fallback = pool.filter(r => !res.map(x=>x.id).includes(r.id)); if (fallback.length) res.push(fallback[Math.floor(Math.random()*fallback.length)]); break; }
+    const good = avail.filter(r => r.feedback === 'good');
+    const pick = good.length && Math.random() < 0.4 ? good[Math.floor(Math.random()*good.length)] : avail[Math.floor(Math.random()*avail.length)];
+    res.push(pick);
+    used.push(String(pick.id));
+  }
+  return res;
+}
+
+async function generateMenu() {
+  const recipes = load();
+  const hist = loadHist();
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>生成中...';
+
+  let chosen = [];
+
+  if (currentMode === 'daily') {
+    const meat = recipes.filter(r => r.cat === '荤菜');
+    const veg = recipes.filter(r => r.cat === '素菜');
+    const soup = recipes.filter(r => r.cat === '汤');
+    if (!meat.length || veg.length < 2 || !soup.length) {
+      showToast('菜谱不够！需要至少1荤2素1汤');
+      btn.disabled = false; btn.innerHTML = '生成今日菜单';
+      return;
+    }
+    chosen = [...pickRandom(meat, hist, 1), ...pickRandom(veg, hist, 2), ...pickRandom(soup, hist, 1)];
+  } else if (currentMode === 'healthy') {
+    const pool = recipes.filter(r => r.healthy === 'healthy');
+    if (pool.length < 2) { showToast('健康减脂菜不够，请先添加带"健康减脂"标签的菜谱'); btn.disabled = false; btn.innerHTML = '生成今日菜单'; return; }
+    chosen = await aiHealthyPick(pool, hist);
+  } else {
+    const pool = recipes.filter(r => r.cat === '一锅出');
+    if (!pool.length) { showToast('还没有一锅出菜谱，去添加几道吧'); btn.disabled = false; btn.innerHTML = '生成今日菜单'; return; }
+    chosen = pickRandom(pool, hist, 1);
+  }
+
+  saveHist([...hist, ...chosen.map(r => r.id)]);
+  renderDailyResult(chosen);
+  renderWechat(chosen);
+
+  btn.disabled = false; btn.innerHTML = '换一组 ↺';
+}
+
+async function aiHealthyPick(pool, hist) {
+  try {
+    const names = pool.map(r => `${r.id}:${r.name}(${r.cat})`).join('，');
+    const res = await callClaude(`你是家庭营养师。从以下健康减脂菜谱中，选出营养均衡、适合一顿饭的2-3道菜（注意荤素搭配，避免重油重盐），只返回逗号分隔的id数字，如"1,3,5"。菜谱列表：${names}。家里有小朋友，口味清淡，最多微辣。`);
+    const ids = res.match(/\d+/g)?.map(Number) || [];
+    const picked = ids.map(id => pool.find(r => r.id === id)).filter(Boolean);
+    return picked.length >= 2 ? picked : pickRandom(pool, hist, 3);
+  } catch { return pickRandom(pool, hist, 3); }
+}
+
+// ── Render daily ──────────────────────────────────────
+const catLabel = {荤菜:'🥩 荤菜', 素菜:'🥦 素菜', 汤:'🍲 汤', 一锅出:'🥘 一锅出'};
+
+function renderDailyResult(chosen) {
+  document.getElementById('daily-result').innerHTML = chosen.map(r => `
+    <div class="daily-recipe" id="dr-${r.id}">
+      <div class="daily-recipe-hd">
+        <span class="badge ${catBadge(r.cat)}">${catLabel[r.cat]||r.cat}</span>
+        <h3>${r.name}</h3>
+        ${r.healthy==='healthy'?'<span class="badge badge-healthy">减脂</span>':''}
+      </div>
+      <div class="daily-recipe-body">
+        <div class="ingr"><strong>食材：</strong>${r.ingr}</div>
+        <div class="steps">${r.steps}</div>
+        ${r.link?`<div class="link"><a href="${r.link}" target="_blank">📎 查看原帖</a></div>`:''}
+      </div>
+      <div class="feedback-row">
+        <button class="feedback-btn ${r.feedback==='good'?'active-good':''}" onclick="setFeedback(${r.id},'good',this,'${r.id}')">👍 好吃</button>
+        <button class="feedback-btn" onclick="addFeedbackNote(${r.id})">💬 备注</button>
+        <button class="feedback-btn ${r.feedback==='bad'?'active-bad':''}" onclick="setFeedback(${r.id},'bad',this,'${r.id}')">👎 不再推</button>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('wechat-section').style.display = 'block';
+}
+
+function catBadge(cat) {
+  return {荤菜:'badge-meat',素菜:'badge-veg',汤:'badge-soup',一锅出:'badge-pot'}[cat]||'';
+}
+
+function setFeedback(id, fb, btn, rid) {
+  const recipes = load();
+  const r = recipes.find(x => x.id === id);
+  if (!r) return;
+  r.feedback = r.feedback === fb ? '' : fb;
+  save(recipes);
+  const row = document.querySelector(`#dr-${rid} .feedback-row`);
+  row.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('active-good','active-bad'));
+  if (r.feedback === 'good') row.children[0].classList.add('active-good');
+  if (r.feedback === 'bad') row.children[2].classList.add('active-bad');
+  showToast(r.feedback === 'good' ? '已标记好吃 👍' : r.feedback === 'bad' ? '已标记不再推 👎' : '已取消反馈');
+}
+
+function addFeedbackNote(id) {
+  const note = prompt('备注这道菜（如"有点咸"、"小朋友不喜欢"）：');
+  if (!note) return;
+  const recipes = load();
+  const r = recipes.find(x => x.id === id);
+  if (r) { r.note = note; save(recipes); showToast('备注已保存'); }
+}
+
+// ── Wechat ────────────────────────────────────────────
+function renderWechat(chosen) {
+  const now = new Date();
+  const days = ['日','一','二','三','四','五','六'];
+  const dateStr = `${now.getMonth()+1}月${now.getDate()}日（周${days[now.getDay()]}）`;
+  const modeNames = {daily:'日常菜单', healthy:'健康减脂菜单', weekend:'周末一锅出'};
+  const j = getCurrentJieqi();
+
+  let txt = `🍽️ ${dateStr} ${modeNames[currentMode]}\n`;
+  if (j) txt += `🌿 节气提示：${j.name}，${j.tip}\n`;
+  txt += '─'.repeat(18) + '\n\n';
+
+  chosen.forEach(r => {
+    txt += `${catLabel[r.cat]||r.cat} · ${r.name}\n`;
+    txt += `【食材】${r.ingr}\n`;
+    txt += `【步骤】\n${r.steps}\n`;
+    if (r.link) txt += `【原帖】${r.link}\n`;
+    if (r.note) txt += `【备注】${r.note}\n`;
+    txt += '\n';
+  });
+  txt += '辛苦啦！有问题随时问我 😊';
+  document.getElementById('wechat-text').textContent = txt;
+}
+
+function copyMsg() {
+  navigator.clipboard.writeText(document.getElementById('wechat-text').textContent)
+    .then(() => showToast('已复制，去发给阿姨吧 ✓'));
+}
+
+// ── Library ───────────────────────────────────────────
+let currentFilter = '';
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderLibrary();
+}
+
+function renderLibrary() {
+  const recipes = load();
+  const filtered = currentFilter === 'healthy' ? recipes.filter(r => r.healthy === 'healthy')
+    : currentFilter ? recipes.filter(r => r.cat === currentFilter) : recipes;
+
+  document.getElementById('stat-total').textContent = recipes.length;
+  document.getElementById('stat-good').textContent = recipes.filter(r => r.feedback === 'good').length;
+  document.getElementById('stat-bad').textContent = recipes.filter(r => r.feedback === 'bad').length;
+
+  const grid = document.getElementById('recipe-grid');
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="icon">🥢</div><p>还没有这个分类的菜谱</p></div>';
+    return;
+  }
+  grid.innerHTML = filtered.map(r => `
+    <div class="recipe-tile" onclick="openDetail(${r.id})">
+      <div class="tag-row">
+        <span class="badge ${catBadge(r.cat)}">${r.cat}</span>
+        ${r.healthy==='healthy'?'<span class="badge badge-healthy">减脂</span>':''}
+      </div>
+      <h4>${r.name}</h4>
+      <p>${r.ingr.slice(0,35)}${r.ingr.length>35?'…':''}</p>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+        ${r.feedback==='good'?'<span class="feedback-dot dot-good"></span><span style="font-size:11px;color:#3B6D11">喜欢</span>':''}
+        ${r.feedback==='bad'?'<span class="feedback-dot dot-bad"></span><span style="font-size:11px;color:#A32D2D">不再推</span>':''}
+        ${r.note?`<span style="font-size:11px;color:#B4B2A9">📝 ${r.note.slice(0,8)}</span>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function openDetail(id) {
+  const recipes = load();
+  const r = recipes.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-hd">
+      <h2>${r.name}</h2>
+      <button class="close-btn" onclick="closeModal()">×</button>
+    </div>
+    <div class="tag-row" style="margin-bottom:1rem">
+      <span class="badge ${catBadge(r.cat)}">${r.cat}</span>
+      ${r.healthy==='healthy'?'<span class="badge badge-healthy">健康减脂</span>':''}
+      ${r.feedback==='good'?'<span class="badge" style="background:#EAF3DE;color:#3B6D11">家人喜欢 👍</span>':''}
+      ${r.feedback==='bad'?'<span class="badge" style="background:#FCEBEB;color:#A32D2D">不再推荐 👎</span>':''}
+    </div>
+    <p style="font-size:13px;color:#5F5E5A;margin-bottom:1rem"><strong>食材：</strong>${r.ingr}</p>
+    <p style="font-size:13px;color:#2C2C2A;line-height:1.8;white-space:pre-wrap;margin-bottom:1rem">${r.steps}</p>
+    ${r.link?`<p style="margin-bottom:1rem"><a href="${r.link}" target="_blank" style="color:#6B8F71;font-size:13px">📎 查看原帖</a></p>`:''}
+    ${r.note?`<p style="font-size:13px;color:#5F5E5A;margin-bottom:1rem">📝 备注：${r.note}</p>`:''}
+    <button class="btn btn-danger btn-full btn-sm" onclick="deleteRecipe(${id})">删除这道菜</button>
+  `;
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modal-bg'))
+    document.getElementById('modal-bg').classList.remove('open');
+}
+
+function deleteRecipe(id) {
+  if (!confirm('确定删除这道菜？')) return;
+  const recipes = load().filter(r => r.id !== id);
+  save(recipes);
+  closeModal();
+  renderLibrary();
+  showToast('已删除');
+}
+
+// ── Import tabs ───────────────────────────────────────
+function setImport(type, el) {
+  document.querySelectorAll('.import-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.import-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('import-' + type).classList.add('active');
+}
+
+// ── Link import ───────────────────────────────────────
+async function importFromLink() {
+  const url = document.getElementById('link-url').value.trim();
+  if (!url) { showToast('请先粘贴链接'); return; }
+  const preview = document.getElementById('link-preview');
+  preview.style.display = 'block';
+  preview.innerHTML = '<div class="loading"><span class="spinner"></span>AI 正在识别菜谱内容...</div>';
+
+  try {
+    const prompt = `你是一个菜谱解析助手。用户分享了一个菜谱链接：${url}
+
+请根据链接URL推断并生成一道合理的中式家常菜菜谱（如果是小红书/公众号/B站链接，按该平台风格生成）。
+
+返回严格的JSON格式，不要加任何解释：
+{
+  "name": "菜名",
+  "cat": "荤菜或素菜或汤或一锅出",
+  "healthy": "normal或healthy",
+  "ingr": "食材1，食材2，...",
+  "steps": "第一步：...\n第二步：...",
+  "link": "${url}"
+}
+
+注意：健康减脂菜（如清蒸、少油烹饪）标记healthy，其余标normal。菜品要适合家庭日常，口味清淡，微辣以下。`;
+
+    const text = await callClaude(prompt);
+    const json = JSON.parse(text.replace(/```json|```/g,'').trim());
+    showImportPreview(json, preview, 'link');
+  } catch (e) {
+    preview.innerHTML = `<div class="card"><p style="color:#A32D2D;font-size:14px">识别失败，请手动录入这道菜。</p><button class="btn btn-outline btn-sm" onclick="setImport('manual',document.querySelectorAll('.import-tab')[2])">去手动录入</button></div>`;
+  }
+}
+
+function showImportPreview(r, container, source) {
+  container.innerHTML = `
+    <div class="card" style="margin-top:10px">
+      <div class="tag-row" style="margin-bottom:8px">
+        <span class="badge ${catBadge(r.cat)}">${r.cat}</span>
+        ${r.healthy==='healthy'?'<span class="badge badge-healthy">健康减脂</span>':''}
+      </div>
+      <h3 style="font-size:16px;margin-bottom:8px">${r.name}</h3>
+      <p style="font-size:13px;color:#5F5E5A;margin-bottom:6px"><strong>食材：</strong>${r.ingr}</p>
+      <p style="font-size:13px;line-height:1.7;white-space:pre-wrap;margin-bottom:10px">${r.steps}</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="confirmImport(${JSON.stringify(r).split('"').join("'")})">✓ 保存这道菜</button>
+        <button class="btn btn-outline" onclick="document.getElementById('import-${source}').querySelector('[id]').style.display='none'">取消</button>
+      </div>
+    </div>
+  `;
+}
+
+function confirmImport(rStr) {
+  const r = typeof rStr === 'string' ? JSON.parse(rStr.split("'").join('"')) : rStr;
+  const recipes = load();
+  r.id = Date.now();
+  r.feedback = '';
+  recipes.push(r);
+  save(recipes);
+  showToast(`"${r.name}" 已添加到菜谱库 ✓`);
+  document.getElementById('link-url').value = '';
+  document.getElementById('link-preview').style.display = 'none';
+  document.getElementById('file-preview').style.display = 'none';
+}
+
+// ── File import ───────────────────────────────────────
+async function handleFileUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const preview = document.getElementById('file-preview');
+  preview.style.display = 'block';
+  preview.innerHTML = '<div class="loading"><span class="spinner"></span>AI 正在解析文件中的菜谱...</div>';
+
+  try {
+    const isExcel = file.name.match(/\.xlsx?$/i);
+    let content = '';
+
+    if (isExcel) {
+      const ab = await file.arrayBuffer();
+      const bytes = new Uint8Array(ab);
+      let str = '';
+      for (let i = 0; i < Math.min(bytes.length, 50000); i++) str += String.fromCharCode(bytes[i]);
+      content = `这是一个Excel文件（${file.name}），文件大小${(file.size/1024).toFixed(0)}KB。请生成3道典型的家常菜菜谱作为示例导入。`;
+    } else {
+      const reader = new FileReader();
+      content = await new Promise(res => { reader.onload = e => res(e.target.result); reader.readAsText(file, 'utf-8'); });
+      content = content.slice(0, 3000);
+    }
+
+    const prompt = `你是菜谱解析助手。根据以下内容，提取或生成3道家常菜菜谱。
+
+内容：${content}
+
+返回严格JSON数组，不要加任何说明：
+[{"name":"菜名","cat":"荤菜或素菜或汤或一锅出","healthy":"normal或healthy","ingr":"食材","steps":"步骤","link":""}]
+
+要求：口味清淡，微辣以下，适合家庭。`;
+
+    const text = await callClaude(prompt);
+    const arr = JSON.parse(text.replace(/```json|```/g,'').trim());
+
+    preview.innerHTML = `<div style="margin-top:10px">
+      <p style="font-size:13px;color:#5F5E5A;margin-bottom:10px">识别到 ${arr.length} 道菜谱，确认后全部导入：</p>
+      ${arr.map((r,i) => `<div class="card card-sm" style="margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge ${catBadge(r.cat)}">${r.cat}</span>
+          <strong style="font-size:14px">${r.name}</strong>
+          ${r.healthy==='healthy'?'<span class="badge badge-healthy">减脂</span>':''}
+        </div>
+        <p style="font-size:12px;color:#5F5E5A;margin-top:4px">${r.ingr.slice(0,50)}...</p>
+      </div>`).join('')}
+      <button class="btn btn-primary btn-full" onclick='confirmBatchImport(${JSON.stringify(arr)})'>全部导入 (${arr.length}道)</button>
+    </div>`;
+  } catch (e) {
+    preview.innerHTML = '<div class="card"><p style="color:#A32D2D;font-size:14px">解析失败，请尝试手动录入。</p></div>';
+  }
+}
+
+function confirmBatchImport(arr) {
+  const recipes = load();
+  arr.forEach(r => { r.id = Date.now() + Math.random(); r.feedback = ''; recipes.push(r); });
+  save(recipes);
+  showToast(`成功导入 ${arr.length} 道菜谱 ✓`);
+  document.getElementById('file-preview').style.display = 'none';
+  document.getElementById('file-input').value = '';
+}
+
+// ── Manual ────────────────────────────────────────────
+function saveManual() {
+  const name = document.getElementById('m-name').value.trim();
+  const ingr = document.getElementById('m-ingr').value.trim();
+  const steps = document.getElementById('m-steps').value.trim();
+  if (!name || !ingr || !steps) { showToast('请填写菜名、食材和步骤'); return; }
+  const r = {
+    id: Date.now(), name,
+    cat: document.getElementById('m-cat').value,
+    healthy: document.getElementById('m-healthy').value,
+    ingr, steps,
+    link: document.getElementById('m-link').value.trim(),
+    feedback: ''
+  };
+  const recipes = load();
+  recipes.push(r);
+  save(recipes);
+  showToast(`"${name}" 已保存 ✓`);
+  ['m-name','m-ingr','m-steps','m-link'].forEach(id => document.getElementById(id).value = '');
+  showPage('library');
+}
+
+// ── Claude API ────────────────────────────────────────
+async function callClaude(prompt) {
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ prompt }),
+  });
+  if (!res.ok) throw new Error('api_error');
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.text;
+}
+
+// ── Toast ─────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── Init ──────────────────────────────────────────────
+renderJieqi();
+renderLibrary();
+</script>
+</body>
+</html>
