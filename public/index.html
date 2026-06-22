@@ -233,26 +233,37 @@
   <div class="import-panel active" id="import-link">
     <div class="card">
       <div class="form-field" style="margin-bottom:10px">
-        <label>原帖链接（选填，保存来源用）</label>
-        <input type="url" id="link-url" placeholder="https://www.xiaohongshu.com/...">
+        <label>菜名</label>
+        <input type="text" id="link-name" placeholder="如：鲜虾Taco">
+      </div>
+      <div class="form-row two">
+        <div class="form-field">
+          <label>分类</label>
+          <select id="link-cat">
+            <option value="荤菜">荤菜 🥩</option>
+            <option value="素菜">素菜 🥦</option>
+            <option value="汤">汤 🍲</option>
+            <option value="一锅出">一锅出 🥘</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>健康属性</label>
+          <select id="link-healthy">
+            <option value="normal">普通</option>
+            <option value="healthy">健康减脂</option>
+          </select>
+        </div>
       </div>
       <div class="form-field" style="margin-bottom:10px">
-        <label>截图上传 <span style="color:#B4B2A9">（可多张，支持图文混合的小红书帖子）</span></label>
-        <div class="drop-zone" onclick="document.getElementById('img-input').click()" id="img-drop-zone">
-          <div style="font-size:28px">📸</div>
-          <p>点击上传截图</p>
-          <div class="hint">可同时上传多张图片</div>
-        </div>
-        <input type="file" id="img-input" accept="image/*" multiple style="display:none" onchange="previewImages(this)">
-        <div id="img-preview-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+        <label>视频链接（小红书 / B站 / 抖音等）</label>
+        <input type="url" id="link-url" placeholder="https://www.xiaohongshu.com/...">
       </div>
       <div class="form-field" style="margin-bottom:12px">
-        <label>补充文字（选填）<span style="color:#B4B2A9">——图里没有的信息可以在这里补充</span></label>
-        <textarea id="link-content" style="min-height:60px" placeholder="如：分量是4人份，不喜欢香菜..."></textarea>
+        <label>备注（选填）<span style="color:#B4B2A9">——如：4人份、少放辣</span></label>
+        <input type="text" id="link-note" placeholder="">
       </div>
-      <button class="btn btn-primary btn-full" onclick="importFromLink()">🤖 AI 识别图片生成菜谱</button>
+      <button class="btn btn-primary btn-full" onclick="saveFromLink()">保存到菜谱库</button>
     </div>
-    <div id="link-preview" style="display:none"></div>
   </div>
 
   <!-- File import -->
@@ -487,9 +498,11 @@ function renderDailyResult(chosen) {
         ${r.healthy==='healthy'?'<span class="badge badge-healthy">减脂</span>':''}
       </div>
       <div class="daily-recipe-body">
-        <div class="ingr"><strong>食材：</strong>${r.ingr}</div>
-        <div class="steps">${r.steps}</div>
-        ${r.link?`<div class="link"><a href="${r.link}" target="_blank">📎 查看原帖</a></div>`:''}
+        ${r.isVideo
+          ? `<div style="margin-bottom:10px"><a href="${r.link}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#EEF3EF;color:#3B6D11;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:500">▶ 点击看烹饪视频</a></div>`
+          : `<div class="ingr"><strong>食材：</strong>${r.ingr}</div><div class="steps">${r.steps}</div>${r.link?'<div class="link"><a href="'+r.link+'" target="_blank">📎 查看原帖</a></div>':''}`
+        }
+        ${r.note?`<div style="font-size:12px;color:#B4B2A9;margin-top:6px">备注：${r.note}</div>`:''}
       </div>
       <div class="feedback-row">
         <button class="feedback-btn ${r.feedback==='good'?'active-good':''}" onclick="setFeedback(${r.id},'good',this,'${r.id}')">👍 好吃</button>
@@ -540,9 +553,13 @@ function renderWechat(chosen) {
 
   chosen.forEach(r => {
     txt += `${catLabel[r.cat]||r.cat} · ${r.name}\n`;
-    txt += `【食材】${r.ingr}\n`;
-    txt += `【步骤】\n${r.steps}\n`;
-    if (r.link) txt += `【原帖】${r.link}\n`;
+    if (r.isVideo) {
+      txt += `【视频】${r.link}\n`;
+    } else {
+      txt += `【食材】${r.ingr}\n`;
+      txt += `【步骤】\n${r.steps}\n`;
+      if (r.link) txt += `【原帖】${r.link}\n`;
+    }
     if (r.note) txt += `【备注】${r.note}\n`;
     txt += '\n';
   });
@@ -585,7 +602,7 @@ function renderLibrary() {
         ${r.healthy==='healthy'?'<span class="badge badge-healthy">减脂</span>':''}
       </div>
       <h4>${r.name}</h4>
-      <p>${r.ingr.slice(0,35)}${r.ingr.length>35?'…':''}</p>
+      <p>${r.isVideo ? '▶ 视频菜谱' : r.ingr.slice(0,35)+(r.ingr.length>35?'…':'')}</p>
       <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
         ${r.feedback==='good'?'<span class="feedback-dot dot-good"></span><span style="font-size:11px;color:#3B6D11">喜欢</span>':''}
         ${r.feedback==='bad'?'<span class="feedback-dot dot-bad"></span><span style="font-size:11px;color:#A32D2D">不再推</span>':''}
@@ -642,6 +659,33 @@ function setImport(type, el) {
 }
 
 // ── Link import ───────────────────────────────────────
+function saveFromLink() {
+  const name = document.getElementById('link-name').value.trim();
+  const url = document.getElementById('link-url').value.trim();
+  if (!name) { showToast('请填写菜名'); return; }
+  if (!url) { showToast('请填写视频链接'); return; }
+  const r = {
+    id: Date.now(),
+    name,
+    cat: document.getElementById('link-cat').value,
+    healthy: document.getElementById('link-healthy').value,
+    ingr: '',
+    steps: '请点击下方原视频链接，照着视频步骤操作。',
+    link: url,
+    note: document.getElementById('link-note').value.trim(),
+    feedback: '',
+    isVideo: true,
+  };
+  const recipes = load();
+  recipes.push(r);
+  save(recipes);
+  showToast(`"${name}" 已保存 ✓`);
+  document.getElementById('link-name').value = '';
+  document.getElementById('link-url').value = '';
+  document.getElementById('link-note').value = '';
+  showPage('library');
+}
+
 let uploadedImages = []; // [{base64, type}]
 
 function previewImages(input) {
