@@ -233,10 +233,24 @@
   <div class="import-panel active" id="import-link">
     <div class="card">
       <div class="form-field" style="margin-bottom:10px">
-        <label>粘贴菜谱链接（小红书、公众号、B站等）</label>
-        <input type="url" id="link-url" placeholder="https://...">
+        <label>原帖链接（选填，保存来源用）</label>
+        <input type="url" id="link-url" placeholder="https://www.xiaohongshu.com/...">
       </div>
-      <button class="btn btn-primary btn-full" onclick="importFromLink()">🤖 AI 自动识别菜谱</button>
+      <div class="form-field" style="margin-bottom:10px">
+        <label>截图上传 <span style="color:#B4B2A9">（可多张，支持图文混合的小红书帖子）</span></label>
+        <div class="drop-zone" onclick="document.getElementById('img-input').click()" id="img-drop-zone">
+          <div style="font-size:28px">📸</div>
+          <p>点击上传截图</p>
+          <div class="hint">可同时上传多张图片</div>
+        </div>
+        <input type="file" id="img-input" accept="image/*" multiple style="display:none" onchange="previewImages(this)">
+        <div id="img-preview-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+      </div>
+      <div class="form-field" style="margin-bottom:12px">
+        <label>补充文字（选填）<span style="color:#B4B2A9">——图里没有的信息可以在这里补充</span></label>
+        <textarea id="link-content" style="min-height:60px" placeholder="如：分量是4人份，不喜欢香菜..."></textarea>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="importFromLink()">🤖 AI 识别图片生成菜谱</button>
     </div>
     <div id="link-preview" style="display:none"></div>
   </div>
@@ -628,35 +642,96 @@ function setImport(type, el) {
 }
 
 // ── Link import ───────────────────────────────────────
+let uploadedImages = []; // [{base64, type}]
+
+function previewImages(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  const row = document.getElementById('img-preview-row');
+  uploadedImages = [];
+  row.innerHTML = '';
+  files.forEach((file, i) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const base64 = e.target.result.split(',')[1];
+      uploadedImages.push({ base64, type: file.type });
+      const img = document.createElement('div');
+      img.style.cssText = 'position:relative;width:72px;height:72px;';
+      img.innerHTML = `<img src="${e.target.result}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #E8E4DC">
+        <button onclick="removeImage(${i})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#A32D2D;color:white;border:none;font-size:11px;cursor:pointer;line-height:18px;padding:0">×</button>`;
+      row.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function removeImage(i) {
+  uploadedImages.splice(i, 1);
+  document.getElementById('img-input').value = '';
+  const row = document.getElementById('img-preview-row');
+  row.innerHTML = '';
+  uploadedImages.forEach((img, idx) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'position:relative;width:72px;height:72px;';
+    div.innerHTML = `<img src="data:${img.type};base64,${img.base64}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #E8E4DC">
+      <button onclick="removeImage(${idx})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#A32D2D;color:white;border:none;font-size:11px;cursor:pointer;line-height:18px;padding:0">×</button>`;
+    row.appendChild(div);
+  });
+}
+
 async function importFromLink() {
   const url = document.getElementById('link-url').value.trim();
-  if (!url) { showToast('请先粘贴链接'); return; }
+  const extraText = document.getElementById('link-content').value.trim();
   const preview = document.getElementById('link-preview');
+
+  if (!uploadedImages.length && !extraText) {
+    showToast('请上传截图或填写文字内容');
+    return;
+  }
+
   preview.style.display = 'block';
-  preview.innerHTML = '<div class="loading"><span class="spinner"></span>AI 正在识别菜谱内容...</div>';
+  preview.innerHTML = '<div class="loading"><span class="spinner"></span>AI 正在识别图片内容...</div>';
 
   try {
-    const prompt = `你是一个菜谱解析助手。用户分享了一个菜谱链接：${url}
+    const textPrompt = `你是一个家庭菜谱整理助手。请从以下图片（小红书/公众号菜谱截图）中提取菜谱信息。
+${extraText ? '用户补充说明：' + extraText : ''}
 
-请根据链接URL推断并生成一道合理的中式家常菜菜谱（如果是小红书/公众号/B站链接，按该平台风格生成）。
-
-返回严格的JSON格式，不要加任何解释：
+返回严格的JSON格式，不要加任何解释或markdown符号：
 {
   "name": "菜名",
   "cat": "荤菜或素菜或汤或一锅出",
   "healthy": "normal或healthy",
-  "ingr": "食材1，食材2，...",
-  "steps": "第一步：...\n第二步：...",
+  "ingr": "食材1份量，食材2份量，...",
+  "steps": "第一步：...\n第二步：...\n第三步：...",
   "link": "${url}"
 }
 
-注意：健康减脂菜（如清蒸、少油烹饪）标记healthy，其余标normal。菜品要适合家庭日常，口味清淡，微辣以下。`;
+要求：严格按图片内容整理，步骤用"第X步："开头，健康减脂菜标healthy，有肉海鲜=荤菜，纯蔬菜=素菜，汤类=汤，一锅有荤有素=一锅出。`;
 
-    const text = await callClaude(prompt);
-    const json = JSON.parse(text.replace(/```json|```/g,'').trim());
+    // Build message content with images
+    const msgContent = [
+      ...uploadedImages.map(img => ({
+        type: 'image_url',
+        image_url: { url: `data:${img.type};base64,${img.base64}` }
+      })),
+      { type: 'text', text: textPrompt }
+    ];
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: textPrompt, images: uploadedImages }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'API 请求失败');
+
+    const json = JSON.parse(data.text.replace(/```json|```/g,'').trim());
     showImportPreview(json, preview, 'link');
+    uploadedImages = [];
+    document.getElementById('img-preview-row').innerHTML = '';
+    document.getElementById('img-input').value = '';
   } catch (e) {
-    preview.innerHTML = `<div class="card"><p style="color:#A32D2D;font-size:14px">识别失败，请手动录入这道菜。</p><button class="btn btn-outline btn-sm" onclick="setImport('manual',document.querySelectorAll('.import-tab')[2])">去手动录入</button></div>`;
+    preview.innerHTML = `<div class="card"><p style="color:#A32D2D;font-size:14px">识别失败：${e.message}</p><button class="btn btn-outline btn-sm" onclick="setImport('manual',document.querySelectorAll('.import-tab')[2])">去手动录入</button></div>`;
   }
 }
 
@@ -782,9 +857,8 @@ async function callClaude(prompt) {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ prompt }),
   });
-  if (!res.ok) throw new Error('api_error');
   const data = await res.json();
-  if (data.error) throw new Error(data.error);
+  if (!res.ok || data.error) throw new Error(data.error || 'API 请求失败');
   return data.text;
 }
 
